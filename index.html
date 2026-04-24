@@ -13,23 +13,36 @@ body {
   color: #e2e8f0;
 }
 
-header {
-  text-align: center;
-  padding: 30px;
+/* NAV */
+nav {
   background: #020617;
+  padding: 15px;
+  text-align: center;
+  position: sticky;
+  top: 0;
 }
 
-h1 {
-  margin: 0;
-  font-size: 2.5em;
+nav a {
+  color: #38bdf8;
+  margin: 0 20px;
+  text-decoration: none;
+  font-weight: bold;
+  cursor: pointer;
 }
 
-.container {
-  max-width: 800px;
-  margin: auto;
+/* SECCIONES */
+.section {
+  display: none;
   padding: 20px;
+  max-width: 900px;
+  margin: auto;
 }
 
+.active {
+  display: block;
+}
+
+/* TARJETAS */
 .card {
   background: #1e293b;
   padding: 20px;
@@ -42,6 +55,7 @@ h1 {
   transform: scale(1.02);
 }
 
+/* BOTONES */
 button {
   background: #38bdf8;
   border: none;
@@ -55,6 +69,7 @@ button:hover {
   background: #0ea5e9;
 }
 
+/* INPUT */
 input {
   padding: 10px;
   width: 70%;
@@ -62,6 +77,7 @@ input {
   border: none;
 }
 
+/* COMENTARIOS */
 .comment {
   background: #334155;
   padding: 10px;
@@ -74,80 +90,146 @@ input {
 
 <body>
 
-<header>
+<!-- NAV -->
+<nav>
+  <a onclick="showSection('home')">Inicio</a>
+  <a onclick="showSection('debates')">Debates</a>
+  <a onclick="showSection('about')">Sobre</a>
+</nav>
+
+<!-- HOME -->
+<div id="home" class="section active">
   <h1>DebateLab</h1>
-  <p>Donde las ideas compiten, no las personas.</p>
-</header>
+  <p>Una plataforma para jóvenes que quieren pensar mejor, debatir con respeto y entender el mundo.</p>
 
-<div class="container">
+  <div class="card">
+    <h2>Debate de la semana</h2>
+    <p>¿Debería prohibirse la IA en colegios?</p>
+    <button onclick="showSection('debates')">Ir al debate</button>
+  </div>
+</div>
 
-  <!-- DEBATE -->
+<!-- DEBATES -->
+<div id="debates" class="section">
+
   <div class="card">
     <h2>¿Debería prohibirse la IA en colegios?</h2>
 
-    <p>Un tema que divide a estudiantes y profesores en todo el mundo.</p>
+    <button onclick="vote('ia','si')">A favor</button>
+    <button onclick="vote('ia','no')">En contra</button>
 
-    <button onclick="votar('si')">A favor</button>
-    <button onclick="votar('no')">En contra</button>
+    <p id="result-ia"></p>
 
-    <p id="resultado"></p>
-
-    <button onclick="mostrarOpinion()">Ver mi análisis</button>
-
-    <p id="opinion" style="display:none;">
-      No se trata de prohibir la IA, sino de educar su uso. Ignorarla es quedarse atrás.
+    <button onclick="toggleOpinion('op-ia')">Ver análisis</button>
+    <p id="op-ia" style="display:none;">
+      La IA no debe prohibirse, sino integrarse de forma inteligente en la educación.
     </p>
 
-    <!-- Comentarios -->
-    <h3>Opiniones de la comunidad</h3>
+    <h3>Opiniones</h3>
+    <input id="input-ia" placeholder="Tu opinión...">
+    <button onclick="addComment('ia')">Publicar</button>
 
-    <input id="comentarioInput" placeholder="Escribe tu opinión...">
-    <button onclick="agregarComentario()">Publicar</button>
-
-    <div id="comentarios"></div>
+    <div id="comments-ia"></div>
   </div>
 
-  <!-- SOBRE MÍ -->
   <div class="card">
-    <h2>Sobre el proyecto</h2>
-    <p>
-      Este es un espacio creado para jóvenes que quieren pensar mejor, debatir con respeto
-      y entender el mundo más allá de opiniones superficiales.
+    <h2>¿Las redes sociales hacen más daño que bien?</h2>
+
+    <button onclick="vote('redes','si')">Sí</button>
+    <button onclick="vote('redes','no')">No</button>
+
+    <p id="result-redes"></p>
+
+    <button onclick="toggleOpinion('op-redes')">Ver análisis</button>
+    <p id="op-redes" style="display:none;">
+      Depende del uso: pueden ser herramientas poderosas o fuentes de distracción.
     </p>
+
+    <h3>Opiniones</h3>
+    <input id="input-redes" placeholder="Tu opinión...">
+    <button onclick="addComment('redes')">Publicar</button>
+
+    <div id="comments-redes"></div>
   </div>
 
 </div>
 
+<!-- ABOUT -->
+<div id="about" class="section">
+  <h1>Sobre DebateLab</h1>
+
+  <div class="card">
+    <p>
+      DebateLab nace como un proyecto personal para fomentar el pensamiento crítico en jóvenes.
+      La idea es crear un espacio donde las ideas puedan ser discutidas con respeto,
+      profundidad y curiosidad.
+    </p>
+
+    <p>
+      Inspirado en la necesidad de mejores conversaciones en internet,
+      este proyecto busca demostrar que se puede debatir sin caer en polarización.
+    </p>
+  </div>
+</div>
+
 <script>
-let votosSi = 0;
-let votosNo = 0;
-
-function votar(opcion) {
-  if (opcion === 'si') votosSi++;
-  else votosNo++;
-
-  document.getElementById("resultado").innerText =
-    "A favor: " + votosSi + " | En contra: " + votosNo;
+// NAVEGACIÓN
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
 }
 
-function mostrarOpinion() {
-  document.getElementById("opinion").style.display = "block";
+// VOTOS
+function vote(topic, option) {
+  let data = JSON.parse(localStorage.getItem(topic)) || {si:0, no:0};
+
+  data[option]++;
+  localStorage.setItem(topic, JSON.stringify(data));
+
+  document.getElementById("result-" + topic).innerText =
+    "A favor: " + data.si + " | En contra: " + data.no;
 }
 
-function agregarComentario() {
-  let input = document.getElementById("comentarioInput");
-  let texto = input.value;
+// OPINIÓN
+function toggleOpinion(id) {
+  let el = document.getElementById(id);
+  el.style.display = el.style.display === "none" ? "block" : "none";
+}
 
-  if (texto.trim() === "") return;
+// COMENTARIOS
+function addComment(topic) {
+  let input = document.getElementById("input-" + topic);
+  let text = input.value;
 
-  let div = document.createElement("div");
-  div.className = "comment";
-  div.innerText = texto;
+  if (text.trim() === "") return;
 
-  document.getElementById("comentarios").appendChild(div);
+  let comments = JSON.parse(localStorage.getItem("comments-" + topic)) || [];
+  comments.push(text);
+  localStorage.setItem("comments-" + topic, JSON.stringify(comments));
 
   input.value = "";
+  loadComments(topic);
 }
+
+function loadComments(topic) {
+  let container = document.getElementById("comments-" + topic);
+  container.innerHTML = "";
+
+  let comments = JSON.parse(localStorage.getItem("comments-" + topic)) || [];
+
+  comments.forEach(c => {
+    let div = document.createElement("div");
+    div.className = "comment";
+    div.innerText = c;
+    container.appendChild(div);
+  });
+}
+
+// CARGAR DATOS AL INICIO
+["ia","redes"].forEach(topic => {
+  vote(topic,'si'); // hack para mostrar datos
+  loadComments(topic);
+});
 </script>
 
 </body>
