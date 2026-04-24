@@ -1,236 +1,278 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>DebateLab</title>
 
+<!-- Fuente -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<!-- Firebase (SDK moderno) -->
+<script type="module">
+  // Importa SDK modular
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+  import { getFirestore, doc, setDoc, updateDoc, getDoc, onSnapshot, collection, addDoc, query, where, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  // 🔥 PEGA TU CONFIG AQUÍ
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_AUTH_DOMAIN",
+    projectId: "TU_PROJECT_ID",
+    storageBucket: "TU_STORAGE",
+    messagingSenderId: "TU_MSG",
+    appId: "TU_APP_ID"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  // ===== UI STATE =====
+  let currentUser = null;
+
+  // ===== DATA =====
+  const debates = [
+    {id:"ia", title:"¿Debería prohibirse la IA en colegios?", cat:"Educación"},
+    {id:"redes", title:"¿Las redes sociales hacen más daño que bien?", cat:"Sociedad"},
+    {id:"uni", title:"¿La universidad sigue siendo necesaria?", cat:"Educación"},
+    {id:"clima", title:"¿Se debería limitar el consumo para salvar el planeta?", cat:"Sociedad"},
+    {id:"remoto", title:"¿El trabajo remoto es mejor que el presencial?", cat:"Trabajo"},
+    {id:"crypto", title:"¿Las criptomonedas son el futuro?", cat:"Tecnología"},
+    {id:"ia2", title:"¿Se debe regular fuertemente la IA?", cat:"Tecnología"},
+    {id:"salud", title:"¿Las pantallas afectan la salud mental juvenil?", cat:"Sociedad"}
+  ];
+
+  // ===== AUTH =====
+  window.login = async () => {
+    await signInWithPopup(auth, provider);
+  };
+
+  window.logout = async () => {
+    await signOut(auth);
+  };
+
+  onAuthStateChanged(auth, (user) => {
+    currentUser = user;
+    const el = document.getElementById("userBox");
+    if(user){
+      el.innerHTML = `
+        <div class="user">
+          <img src="${user.photoURL}" />
+          <span>${user.displayName}</span>
+          <button class="ghost" onclick="logout()">Salir</button>
+        </div>`;
+    } else {
+      el.innerHTML = `<button class="primary" onclick="login()">Entrar con Google</button>`;
+    }
+  });
+
+  // ===== RENDER =====
+  function render(list = debates){
+    const feed = document.getElementById("feed");
+    feed.innerHTML = "";
+    list.forEach(d=>{
+      const card = document.createElement("div");
+      card.className = "card fade";
+      card.innerHTML = `
+        <div class="tag">${d.cat}</div>
+        <h3>${d.title}</h3>
+
+        <div class="actions">
+          <button class="primary" onclick="vote('${d.id}','si')">👍</button>
+          <button class="secondary" onclick="vote('${d.id}','no')">👎</button>
+          <button class="secondary" onclick="like('${d.id}')">❤️</button>
+          <button class="secondary" onclick="saveDebate('${d.id}')">📌</button>
+        </div>
+
+        <p id="votes-${d.id}" class="muted">Cargando...</p>
+
+        <div class="commentBox">
+          <input id="input-${d.id}" placeholder="Comparte tu argumento..." />
+          <button class="primary" onclick="comment('${d.id}')">Publicar</button>
+        </div>
+
+        <div id="comments-${d.id}" class="comments"></div>
+      `;
+      feed.appendChild(card);
+
+      // listeners realtime
+      subscribeVotes(d.id);
+      subscribeComments(d.id);
+    });
+  }
+
+  // ===== VOTOS =====
+  window.vote = async (id, type) => {
+    const ref = doc(db, "votes", id);
+    const snap = await getDoc(ref);
+    let data = snap.exists() ? snap.data() : {si:0,no:0};
+
+    data[type]++;
+    await setDoc(ref, data);
+  };
+
+  function subscribeVotes(id){
+    const ref = doc(db, "votes", id);
+    onSnapshot(ref, (docu)=>{
+      const d = docu.data() || {si:0,no:0};
+      document.getElementById("votes-"+id).innerText = `👍 ${d.si} | 👎 ${d.no}`;
+      updateTrending();
+    });
+  }
+
+  // ===== COMMENTS =====
+  window.comment = async (id) => {
+    if(!currentUser) return alert("Inicia sesión");
+    const input = document.getElementById("input-"+id);
+    if(!input.value.trim()) return;
+
+    await addDoc(collection(db, "comments"), {
+      debate:id,
+      text:input.value,
+      user:currentUser.displayName,
+      time:Date.now()
+    });
+
+    input.value = "";
+  };
+
+  function subscribeComments(id){
+    const q = query(collection(db, "comments"), where("debate","==",id), orderBy("time"));
+    onSnapshot(q, (snap)=>{
+      const box = document.getElementById("comments-"+id);
+      box.innerHTML = "";
+      snap.forEach(docu=>{
+        const c = docu.data();
+        box.innerHTML += `<div class="comment"><b>${c.user}:</b> ${c.text}</div>`;
+      });
+    });
+  }
+
+  // ===== LIKE / SAVE (local) =====
+  window.like = (id)=>{
+    let l = localStorage.getItem("like_"+id) || 0;
+    localStorage.setItem("like_"+id, ++l);
+  };
+
+  window.saveDebate = (id)=>{
+    let s = JSON.parse(localStorage.getItem("saved")||"[]");
+    if(!s.includes(id)) s.push(id);
+    localStorage.setItem("saved", JSON.stringify(s));
+    loadSaved();
+  };
+
+  function loadSaved(){
+    const el = document.getElementById("saved");
+    el.innerHTML="";
+    let s = JSON.parse(localStorage.getItem("saved")||"[]");
+    s.forEach(id=>{
+      const d = debates.find(x=>x.id===id);
+      if(d) el.innerHTML += `<div>📌 ${d.title}</div>`;
+    });
+  }
+
+  // ===== SEARCH / FILTER =====
+  window.search = (txt)=>{
+    render(debates.filter(d=>d.title.toLowerCase().includes(txt.toLowerCase())));
+  };
+
+  window.filterCat = (cat)=>{
+    if(cat==="all") render();
+    else render(debates.filter(d=>d.cat===cat));
+  };
+
+  // ===== TRENDING =====
+  function updateTrending(){
+    const t = document.getElementById("trending");
+    t.innerHTML="";
+    debates.forEach(async d=>{
+      const ref = doc(db,"votes",d.id);
+      const snap = await getDoc(ref);
+      const data = snap.exists()?snap.data():{si:0,no:0};
+      if(data.si + data.no > 5){
+        t.innerHTML += `<div class="badge">${d.title}</div>`;
+      }
+    });
+  }
+
+  // ===== THEME =====
+  window.toggleTheme = ()=>{
+    document.body.classList.toggle("light");
+  };
+
+  // INIT
+  window.onload = ()=>{
+    render();
+    loadSaved();
+  };
+</script>
+
 <style>
-body {
-  margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: #0f172a;
-  color: #e2e8f0;
+:root{
+  --bg:#0b1220; --card:#121a2b; --text:#e6edf3; --muted:#94a3b8;
+  --accent:#38bdf8; --border:#1f2a44;
 }
-
-/* NAV */
-nav {
-  background: #020617;
-  padding: 15px;
-  text-align: center;
-  position: sticky;
-  top: 0;
+.light{
+  --bg:#f8fafc; --card:#fff; --text:#0f172a; --muted:#64748b;
+  --accent:#0284c7; --border:#e2e8f0;
 }
-
-nav a {
-  color: #38bdf8;
-  margin: 0 20px;
-  text-decoration: none;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-/* SECCIONES */
-.section {
-  display: none;
-  padding: 20px;
-  max-width: 900px;
-  margin: auto;
-}
-
-.active {
-  display: block;
-}
-
-/* TARJETAS */
-.card {
-  background: #1e293b;
-  padding: 20px;
-  border-radius: 12px;
-  margin-bottom: 20px;
-  transition: 0.3s;
-}
-
-.card:hover {
-  transform: scale(1.02);
-}
-
-/* BOTONES */
-button {
-  background: #38bdf8;
-  border: none;
-  padding: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin: 5px;
-}
-
-button:hover {
-  background: #0ea5e9;
-}
-
-/* INPUT */
-input {
-  padding: 10px;
-  width: 70%;
-  border-radius: 8px;
-  border: none;
-}
-
-/* COMENTARIOS */
-.comment {
-  background: #334155;
-  padding: 10px;
-  border-radius: 8px;
-  margin-top: 10px;
-}
+body{margin:0;font-family:Inter;background:var(--bg);color:var(--text)}
+nav{display:flex;justify-content:space-between;padding:15px;border-bottom:1px solid var(--border)}
+.container{display:grid;grid-template-columns:2fr 1fr;gap:20px;padding:20px;max-width:1200px;margin:auto}
+.card{background:var(--card);padding:20px;border-radius:14px;border:1px solid var(--border);margin-bottom:15px}
+button{padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+.primary{background:var(--accent);color:#fff}
+.secondary{background:transparent;border:1px solid var(--border);color:var(--text)}
+.ghost{background:transparent;color:var(--muted)}
+.tag{font-size:12px;color:var(--accent)}
+.muted{color:var(--muted)}
+.comment{margin-top:6px;padding:6px;background:rgba(255,255,255,0.05);border-radius:6px}
+input{padding:8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text)}
+.user{display:flex;align-items:center;gap:10px}
+.user img{width:30px;border-radius:50%}
+.sidebar{background:var(--card);padding:15px;border-radius:12px;border:1px solid var(--border)}
+.badge{background:var(--accent);padding:4px 8px;border-radius:6px;margin-bottom:6px}
+.fade{animation:fade .3s}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+@media(max-width:900px){.container{grid-template-columns:1fr}}
 </style>
 
 </head>
 
 <body>
 
-<!-- NAV -->
 <nav>
-  <a onclick="showSection('home')">Inicio</a>
-  <a onclick="showSection('debates')">Debates</a>
-  <a onclick="showSection('about')">Sobre</a>
+  <h2>DebateLab</h2>
+  <div>
+    <button onclick="filterCat('all')">Todos</button>
+    <button onclick="filterCat('Tecnología')">Tech</button>
+    <button onclick="filterCat('Sociedad')">Sociedad</button>
+    <button onclick="filterCat('Educación')">Educación</button>
+    <button onclick="toggleTheme()">Modo</button>
+  </div>
 </nav>
 
-<!-- HOME -->
-<div id="home" class="section active">
-  <h1>DebateLab</h1>
-  <p>Una plataforma para jóvenes que quieren pensar mejor, debatir con respeto y entender el mundo.</p>
+<div class="container">
 
-  <div class="card">
-    <h2>Debate de la semana</h2>
-    <p>¿Debería prohibirse la IA en colegios?</p>
-    <button onclick="showSection('debates')">Ir al debate</button>
-  </div>
+<div>
+  <input placeholder="Buscar..." oninput="search(this.value)" />
+  <div id="feed"></div>
 </div>
 
-<!-- DEBATES -->
-<div id="debates" class="section">
-
-  <div class="card">
-    <h2>¿Debería prohibirse la IA en colegios?</h2>
-
-    <button onclick="vote('ia','si')">A favor</button>
-    <button onclick="vote('ia','no')">En contra</button>
-
-    <p id="result-ia"></p>
-
-    <button onclick="toggleOpinion('op-ia')">Ver análisis</button>
-    <p id="op-ia" style="display:none;">
-      La IA no debe prohibirse, sino integrarse de forma inteligente en la educación.
-    </p>
-
-    <h3>Opiniones</h3>
-    <input id="input-ia" placeholder="Tu opinión...">
-    <button onclick="addComment('ia')">Publicar</button>
-
-    <div id="comments-ia"></div>
-  </div>
-
-  <div class="card">
-    <h2>¿Las redes sociales hacen más daño que bien?</h2>
-
-    <button onclick="vote('redes','si')">Sí</button>
-    <button onclick="vote('redes','no')">No</button>
-
-    <p id="result-redes"></p>
-
-    <button onclick="toggleOpinion('op-redes')">Ver análisis</button>
-    <p id="op-redes" style="display:none;">
-      Depende del uso: pueden ser herramientas poderosas o fuentes de distracción.
-    </p>
-
-    <h3>Opiniones</h3>
-    <input id="input-redes" placeholder="Tu opinión...">
-    <button onclick="addComment('redes')">Publicar</button>
-
-    <div id="comments-redes"></div>
-  </div>
-
+<div class="sidebar">
+  <div id="userBox"></div>
+  <hr>
+  <h3>Trending</h3>
+  <div id="trending"></div>
+  <hr>
+  <h3>Guardados</h3>
+  <div id="saved"></div>
 </div>
 
-<!-- ABOUT -->
-<div id="about" class="section">
-  <h1>Sobre DebateLab</h1>
-
-  <div class="card">
-    <p>
-      DebateLab nace como un proyecto personal para fomentar el pensamiento crítico en jóvenes.
-      La idea es crear un espacio donde las ideas puedan ser discutidas con respeto,
-      profundidad y curiosidad.
-    </p>
-
-    <p>
-      Inspirado en la necesidad de mejores conversaciones en internet,
-      este proyecto busca demostrar que se puede debatir sin caer en polarización.
-    </p>
-  </div>
 </div>
-
-<script>
-// NAVEGACIÓN
-function showSection(id) {
-  document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-
-// VOTOS
-function vote(topic, option) {
-  let data = JSON.parse(localStorage.getItem(topic)) || {si:0, no:0};
-
-  data[option]++;
-  localStorage.setItem(topic, JSON.stringify(data));
-
-  document.getElementById("result-" + topic).innerText =
-    "A favor: " + data.si + " | En contra: " + data.no;
-}
-
-// OPINIÓN
-function toggleOpinion(id) {
-  let el = document.getElementById(id);
-  el.style.display = el.style.display === "none" ? "block" : "none";
-}
-
-// COMENTARIOS
-function addComment(topic) {
-  let input = document.getElementById("input-" + topic);
-  let text = input.value;
-
-  if (text.trim() === "") return;
-
-  let comments = JSON.parse(localStorage.getItem("comments-" + topic)) || [];
-  comments.push(text);
-  localStorage.setItem("comments-" + topic, JSON.stringify(comments));
-
-  input.value = "";
-  loadComments(topic);
-}
-
-function loadComments(topic) {
-  let container = document.getElementById("comments-" + topic);
-  container.innerHTML = "";
-
-  let comments = JSON.parse(localStorage.getItem("comments-" + topic)) || [];
-
-  comments.forEach(c => {
-    let div = document.createElement("div");
-    div.className = "comment";
-    div.innerText = c;
-    container.appendChild(div);
-  });
-}
-
-// CARGAR DATOS AL INICIO
-["ia","redes"].forEach(topic => {
-  vote(topic,'si'); // hack para mostrar datos
-  loadComments(topic);
-});
-</script>
 
 </body>
 </html>
