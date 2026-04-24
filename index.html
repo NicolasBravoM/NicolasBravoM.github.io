@@ -1,76 +1,154 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>DebateLab</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DebateLab</title>
 
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      background: #0f172a;
-      color: #e2e8f0;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
 
-    header {
-      background: #020617;
-      padding: 20px;
-      text-align: center;
-    }
+header {
+  text-align: center;
+  padding: 30px;
+  background: #020617;
+}
 
-    h1 {
-      margin: 0;
-    }
+h1 {
+  margin: 0;
+  font-size: 2.5em;
+}
 
-    .container {
-      padding: 30px;
-      max-width: 800px;
-      margin: auto;
-    }
+.container {
+  max-width: 800px;
+  margin: auto;
+  padding: 20px;
+}
 
-    .card {
-      background: #1e293b;
-      padding: 20px;
-      border-radius: 12px;
-      margin-bottom: 20px;
-    }
+.card {
+  background: #1e293b;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  transition: 0.3s;
+}
 
-    h2 {
-      color: #38bdf8;
-    }
+.card:hover {
+  transform: scale(1.02);
+}
 
-    h3 {
-      color: #facc15;
-    }
-  </style>
+button {
+  background: #38bdf8;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin: 5px;
+}
+
+button:hover {
+  background: #0ea5e9;
+}
+
+input {
+  padding: 10px;
+  width: 70%;
+  border-radius: 8px;
+  border: none;
+}
+
+.comment {
+  background: #334155;
+  padding: 10px;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+</style>
+
 </head>
 
 <body>
 
 <header>
   <h1>DebateLab</h1>
-  <p>Explorando ideas, cuestionando todo.</p>
+  <p>Donde las ideas compiten, no las personas.</p>
 </header>
 
 <div class="container">
 
+  <!-- DEBATE -->
   <div class="card">
     <h2>¿Debería prohibirse la IA en colegios?</h2>
 
-    <h3>A favor</h3>
-    <p>Puede hacer que los estudiantes dependan menos de su propio pensamiento.</p>
+    <p>Un tema que divide a estudiantes y profesores en todo el mundo.</p>
 
-    <h3>En contra</h3>
-    <p>La IA es una herramienta clave del futuro y aprender a usarla es esencial.</p>
+    <button onclick="votar('si')">A favor</button>
+    <button onclick="votar('no')">En contra</button>
 
-    <h3>Mi postura</h3>
-    <p>No se trata de prohibir, sino de enseñar a usarla con criterio.</p>
+    <p id="resultado"></p>
+
+    <button onclick="mostrarOpinion()">Ver mi análisis</button>
+
+    <p id="opinion" style="display:none;">
+      No se trata de prohibir la IA, sino de educar su uso. Ignorarla es quedarse atrás.
+    </p>
+
+    <!-- Comentarios -->
+    <h3>Opiniones de la comunidad</h3>
+
+    <input id="comentarioInput" placeholder="Escribe tu opinión...">
+    <button onclick="agregarComentario()">Publicar</button>
+
+    <div id="comentarios"></div>
+  </div>
+
+  <!-- SOBRE MÍ -->
+  <div class="card">
+    <h2>Sobre el proyecto</h2>
+    <p>
+      Este es un espacio creado para jóvenes que quieren pensar mejor, debatir con respeto
+      y entender el mundo más allá de opiniones superficiales.
+    </p>
   </div>
 
 </div>
-<div class="card">
-  <h2>Sobre mí</h2>
-  <p>Soy un estudiante interesado en el pensamiento crítico, el debate y cómo las ideas moldean el mundo.</p>
-</div>
+
+<script>
+let votosSi = 0;
+let votosNo = 0;
+
+function votar(opcion) {
+  if (opcion === 'si') votosSi++;
+  else votosNo++;
+
+  document.getElementById("resultado").innerText =
+    "A favor: " + votosSi + " | En contra: " + votosNo;
+}
+
+function mostrarOpinion() {
+  document.getElementById("opinion").style.display = "block";
+}
+
+function agregarComentario() {
+  let input = document.getElementById("comentarioInput");
+  let texto = input.value;
+
+  if (texto.trim() === "") return;
+
+  let div = document.createElement("div");
+  div.className = "comment";
+  div.innerText = texto;
+
+  document.getElementById("comentarios").appendChild(div);
+
+  input.value = "";
+}
+</script>
+
 </body>
 </html>
